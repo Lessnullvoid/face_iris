@@ -1,33 +1,20 @@
-# Eye and Iris Tracking System
+# Eye Tracking System
 
-A real-time eye and iris tracking system using computer vision and machine learning. The system tracks eye movements, blinks, pupil dilation, and can detect emotions based on eye behavior.
+Real-time eye tracking and analysis system using MediaPipe Face Mesh, with pupillometry, emotion detection, and OSC communication.
 
 ## Features
 
-- Real-time eye and iris tracking
+- Real-time face and eye tracking
+- Pupil size measurement and analysis
 - Blink detection
-- Pupil dilation tracking
-- Emotion detection based on eye metrics
-- Pupillometry analysis
-- OSC (Open Sound Control) data streaming
+- Emotion state analysis
 - Interactive GUI controls
-
-## Requirements
-
-- Python 3.7+
-- OpenCV
-- MediaPipe
-- Python-OSC
-- NumPy
+- OSC data streaming
+- Oscilloscope-style visualization
 
 ## Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/eye-tracking-system.git
-cd eye-tracking-system
-```
-
+1. Clone this repository
 2. Install dependencies:
 ```bash
 pip install -r requirements.txt
@@ -35,50 +22,158 @@ pip install -r requirements.txt
 
 ## Usage
 
-Run the main script:
+Run the main application:
 ```bash
 python main.py
 ```
 
 ### Controls
 
-The system features an intuitive GUI with clickable buttons for all controls:
+- [M] - Toggle face mesh visualization
+- [F] - Toggle facial feature points
+- [C] - Toggle face contours
+- [P] - Toggle pupillometry analysis
+- [Z] - Cycle zoom levels (1x-3x)
+- ESC/Q - Quit application
 
-- Click "Mesh [M]" or press 'M' to toggle face mesh visualization
-- Click "Features [F]" or press 'F' to toggle facial feature points
-- Click "Contours [C]" or press 'C' to toggle face contours
-- Click "Pupillometry [P]" or press 'P' to toggle pupillometry analysis
-- Click "Zoom" or press 'Z' to cycle through zoom levels (1x to 3x)
-- Press 'Q' or 'ESC' to quit
+## Detection Methods
 
-All buttons are color-coded:
-- Green: Feature is active
-- Gray: Feature is inactive
+### 1. Eye Tracking
+- Uses MediaPipe Face Mesh for precise facial landmark detection
+- Tracks 468 facial landmarks including detailed eye regions
+- Calculates eye parameters:
+  - Iris diameter and center position
+  - Eye aspect ratio (EAR)
+  - Eye height and contour points
+  - Pupil position and movement
 
-## Project Structure
+### 2. Blink Detection
+- Monitors Eye Aspect Ratio (EAR) for each eye
+- Parameters:
+  - EAR Threshold: 0.2
+  - Minimum consecutive frames: 2
+  - Maximum blink duration: 0.5 seconds
+- Tracks:
+  - Blink state (open/closed)
+  - Blink count
+  - Blink duration
+  - Blink rate (blinks per minute)
 
-- `main.py`: Main application entry point
-- `detectors.py`: Contains detector classes for blinks, pupils, and emotions
-- `visualization.py`: Visualization utilities and GUI controls
-- `eye_tracking.py`: Eye tracking utilities
-- `osc_communication.py`: OSC communication handler
-- `pupillometry.py`: Pupillometry analysis (not included in this repository)
+### 3. Pupillometry Analysis
+- Real-time pupil size monitoring
+- Baseline calibration period
+- Measures:
+  - Absolute pupil diameter
+  - Relative size changes
+  - Change velocity
+  - Size variability
+  - Baseline deviation
+
+### 4. Emotion Detection
+Based on combined analysis of:
+- Blink patterns
+- Pupil dynamics
+- Eye openness
+- Temporal patterns
+
+Detected States:
+- Surprise: Characterized by wide eyes and pupil dilation
+- Focus: Stable pupil size and reduced blink rate
+- Tired: Increased blink rate and reduced eye openness
+- Relaxed: Stable measurements and normal blink rate
+- Stressed: Fluctuating pupil size and irregular blink patterns
 
 ## OSC Communication
 
-The system sends eye tracking data via OSC on port 12345. Available OSC messages include:
+The system streams real-time data via OSC protocol (default: localhost:12345)
 
-- `/iris/left/position`
-- `/iris/right/position`
-- `/eye/left/blink/state`
-- `/eye/right/blink/state`
-- `/emotion/dominant`
-- And many more...
+### OSC Parameters
 
-## Contributing
+#### Basic Eye Parameters
+```
+/iris/left/position          [x, y]     Iris center coordinates
+/iris/right/position         [x, y]     Iris center coordinates
+/iris/left/diameter         float      Iris diameter in pixels
+/iris/right/diameter        float      Iris diameter in pixels
+/iris/average/diameter      float      Average iris diameter
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+#### Eye Metrics
+```
+/eye/left/height           float      Eye opening height
+/eye/right/height          float      Eye opening height
+/eye/left/ear             float      Eye aspect ratio
+/eye/right/ear            float      Eye aspect ratio
+/eye/average/ear          float      Average eye aspect ratio
+```
 
-## License
+#### Blink Detection
+```
+/eye/left/blink/state      int        0: open, 1: closed
+/eye/right/blink/state     int        0: open, 1: closed
+/eye/left/blink/count      int        Cumulative blink count
+/eye/right/blink/count     int        Cumulative blink count
+/eye/left/blink/duration   int        Current blink duration (frames)
+/eye/right/blink/duration  int        Current blink duration (frames)
+/eye/total/blinks         int        Total blink count
+```
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+#### Pupil Analysis
+```
+/pupil/left/changing       int        0: stable, 1: changing
+/pupil/right/changing      int        0: stable, 1: changing
+/pupil/left/change_percentage   float    % change from baseline
+/pupil/right/change_percentage  float    % change from baseline
+/pupil/left/baseline      float      Baseline pupil size
+/pupil/right/baseline     float      Baseline pupil size
+```
+
+#### Pupillometry Analysis
+```
+/pupillometry/status       string     Current analysis state
+/pupillometry/time        float      Analysis duration (seconds)
+/pupillometry/left/change  float      Left pupil % change
+/pupillometry/right/change float      Right pupil % change
+/pupillometry/left/variability   float    Left pupil variability
+/pupillometry/right/variability  float    Right pupil variability
+/pupillometry/left/velocity      float    Left change velocity
+/pupillometry/right/velocity     float    Right change velocity
+/pupillometry/average/change     float    Average pupil change
+/pupillometry/average/variability float    Average variability
+/pupillometry/average/velocity   float    Average velocity
+/pupillometry/baseline/progress  float    Baseline collection progress
+```
+
+#### Emotion Analysis
+```
+/emotion/dominant         string     Current dominant emotion
+/emotion/score/surprise   float      Surprise score (0-1)
+/emotion/score/focus      float      Focus score (0-1)
+/emotion/score/tired      float      Tired score (0-1)
+/emotion/score/relaxed    float      Relaxed score (0-1)
+/emotion/score/stressed   float      Stressed score (0-1)
+/emotion/blink_rate      float      Blinks per minute
+/emotion/eye_openness    float      Relative eye openness
+```
+
+#### Contour Data
+```
+/eye/left/contour        [x,y,...]   Eye contour points
+/eye/right/contour       [x,y,...]   Eye contour points
+/iris/left/contour       [x,y,...]   Iris contour points
+/iris/right/contour      [x,y,...]   Iris contour points
+```
+
+## Project Structure
+
+```
+├── main.py              # Main application
+├── detectors.py         # Detection classes
+├── visualization.py     # Visualization utilities
+├── eye_tracking.py      # Eye tracking functions
+├── pupillometry.py      # Pupillometry analysis
+├── osc_communication.py # OSC handling
+└── requirements.txt     # Dependencies
+```
+
+
