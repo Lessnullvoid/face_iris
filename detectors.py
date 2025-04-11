@@ -1,25 +1,17 @@
 """
-This module contains detector classes for eye tracking and analysis.
-Each detector is responsible for a specific aspect of eye tracking.
+Eye tracking detection classes for blink, pupil, and emotion detection.
 """
 
+import numpy as np
 from collections import deque
 import time
-import numpy as np
+import logging
 
 class BlinkDetector:
-    """Detects and tracks eye blinks."""
+    """Detects blinks using Eye Aspect Ratio (EAR) analysis."""
     
-    def __init__(self, ear_threshold=0.2, blink_time_threshold=0.5):
-        """
-        Initialize the blink detector.
-        
-        Args:
-            ear_threshold (float): Threshold for eye aspect ratio to detect blink
-            blink_time_threshold (float): Maximum time for a blink in seconds
-        """
-        self.ear_threshold = ear_threshold
-        self.blink_time_threshold = blink_time_threshold
+    def __init__(self):
+        """Initialize blink detector with default parameters."""
         self.ear_history = deque(maxlen=3)
         self.blink_start = None
         self.blink_counter = 0
@@ -28,28 +20,28 @@ class BlinkDetector:
         
     def detect(self, ear):
         """
-        Detect blinks based on eye aspect ratio.
+        Detect blink state based on EAR value.
         
         Args:
-            ear (float): Current eye aspect ratio
+            ear (float): Eye Aspect Ratio value
             
         Returns:
-            dict: Dictionary containing blink detection results
+            dict: Blink detection results including state and metrics
         """
         self.ear_history.append(ear)
         
         # Detect eye closure
-        if ear < self.ear_threshold and not self.is_eye_closed:
+        if ear < 0.2 and not self.is_eye_closed:
             self.is_eye_closed = True
             self.blink_start = time.time()
             self.current_blink_frame_count = 0
         
         # Detect eye opening
-        elif ear >= self.ear_threshold and self.is_eye_closed:
+        elif ear >= 0.2 and self.is_eye_closed:
             self.is_eye_closed = False
             if self.blink_start is not None:
                 blink_duration = time.time() - self.blink_start
-                if blink_duration < self.blink_time_threshold:
+                if blink_duration < 0.5:
                     self.blink_counter += 1
                 self.blink_start = None
         
@@ -65,29 +57,23 @@ class BlinkDetector:
         }
 
 class PupilTracker:
-    """Tracks pupil size changes and detects significant variations."""
+    """Tracks pupil size and changes over time."""
     
-    def __init__(self, history_size=30, change_threshold=0.15):
-        """
-        Initialize the pupil tracker.
-        
-        Args:
-            history_size (int): Number of frames to keep in history
-            change_threshold (float): Threshold for significant pupil size change
-        """
-        self.diameter_history = deque(maxlen=history_size)
+    def __init__(self):
+        """Initialize pupil tracker with default parameters."""
+        self.diameter_history = deque(maxlen=30)
         self.baseline = None
-        self.change_threshold = change_threshold
+        self.change_threshold = 0.15
         
     def detect_change(self, current_diameter):
         """
-        Detect changes in pupil diameter.
+        Detect changes in pupil size relative to baseline.
         
         Args:
             current_diameter (float): Current pupil diameter
             
         Returns:
-            dict: Dictionary containing pupil change detection results
+            dict: Pupil change detection results
         """
         self.diameter_history.append(current_diameter)
         
@@ -119,11 +105,11 @@ class PupilTracker:
         }
 
 class EmotionDetector:
-    """Detects emotions based on eye metrics."""
+    """Detects emotional states based on eye behavior patterns."""
     
     def __init__(self):
-        """Initialize the emotion detector with default parameters."""
-        self.blink_rate_history = deque(maxlen=90)  # 3 seconds at 30fps
+        """Initialize emotion detector with default parameters."""
+        self.blink_rate_history = deque(maxlen=90)
         self.pupil_size_history = deque(maxlen=30)
         self.eye_openness_history = deque(maxlen=30)
         self.last_blink_time = time.time()
@@ -137,18 +123,18 @@ class EmotionDetector:
         
     def update(self, left_eye, right_eye, left_pupil, right_pupil, left_blink, right_blink):
         """
-        Update emotion detection based on eye metrics.
+        Update emotion detection based on current eye metrics.
         
         Args:
             left_eye (dict): Left eye parameters
             right_eye (dict): Right eye parameters
-            left_pupil (dict): Left pupil parameters
-            right_pupil (dict): Right pupil parameters
-            left_blink (dict): Left eye blink data
-            right_blink (dict): Right eye blink data
+            left_pupil (dict): Left pupil metrics
+            right_pupil (dict): Right pupil metrics
+            left_blink (dict): Left blink state
+            right_blink (dict): Right blink state
             
         Returns:
-            dict: Dictionary containing emotion detection results
+            dict: Emotion detection results
         """
         current_time = time.time()
         
@@ -158,14 +144,14 @@ class EmotionDetector:
         self.pupil_size_history.append(avg_pupil_size)
         self.eye_openness_history.append(avg_eye_openness)
         
-        # Update blink rate
+        # Calculate blink rate (blinks per minute)
         if left_blink['is_blinking'] or right_blink['is_blinking']:
-            if current_time - self.last_blink_time > 0.1:  # Prevent double counting
+            if current_time - self.last_blink_time > 0.1:
                 self.blink_rate_history.append(1)
                 self.last_blink_time = current_time
         
         # Calculate metrics
-        blink_rate = len(self.blink_rate_history) * (60 / 3)  # Convert to blinks per minute
+        blink_rate = len(self.blink_rate_history) * (60 / 3)
         pupil_change = 0
         if len(self.pupil_size_history) > 1:
             pupil_change = (self.pupil_size_history[-1] - self.pupil_size_history[0]) / self.pupil_size_history[0]
@@ -173,7 +159,11 @@ class EmotionDetector:
         eye_openness_ratio = avg_eye_openness / np.mean(list(self.eye_openness_history)) if self.eye_openness_history else 1.0
         
         # Update emotion scores
-        self._update_emotion_scores(eye_openness_ratio, pupil_change, blink_rate)
+        self.emotion_scores['surprise'] = self._calculate_surprise_score(eye_openness_ratio, pupil_change)
+        self.emotion_scores['focus'] = self._calculate_focus_score(pupil_change, blink_rate)
+        self.emotion_scores['tired'] = self._calculate_tired_score(blink_rate, eye_openness_ratio)
+        self.emotion_scores['relaxed'] = self._calculate_relaxed_score(pupil_change, blink_rate)
+        self.emotion_scores['stressed'] = self._calculate_stressed_score(pupil_change, blink_rate)
         
         # Get dominant emotion
         dominant_emotion = max(self.emotion_scores.items(), key=lambda x: x[1])
@@ -186,61 +176,51 @@ class EmotionDetector:
             'eye_openness_ratio': eye_openness_ratio
         }
     
-    def _update_emotion_scores(self, eye_openness_ratio, pupil_change, blink_rate):
-        """
-        Update emotion scores based on eye metrics.
-        
-        Args:
-            eye_openness_ratio (float): Ratio of current eye openness to average
-            pupil_change (float): Change in pupil size
-            blink_rate (float): Current blink rate
-        """
-        self.emotion_scores['surprise'] = self._calculate_surprise_score(eye_openness_ratio, pupil_change)
-        self.emotion_scores['focus'] = self._calculate_focus_score(pupil_change, blink_rate)
-        self.emotion_scores['tired'] = self._calculate_tired_score(blink_rate, eye_openness_ratio)
-        self.emotion_scores['relaxed'] = self._calculate_relaxed_score(pupil_change, blink_rate)
-        self.emotion_scores['stressed'] = self._calculate_stressed_score(pupil_change, blink_rate)
-    
     def _calculate_surprise_score(self, eye_openness_ratio, pupil_change):
+        """Calculate surprise score based on eye openness and pupil dilation."""
         score = 0.0
-        if eye_openness_ratio > 1.2:  # Eyes wide open
+        if eye_openness_ratio > 1.2:
             score += 0.5
-        if pupil_change > 0.15:  # Pupils dilated
+        if pupil_change > 0.15:
             score += 0.5
         return min(1.0, score)
     
     def _calculate_focus_score(self, pupil_change, blink_rate):
+        """Calculate focus score based on pupil stability and blink rate."""
         score = 0.0
-        if abs(pupil_change) < 0.1:  # Stable pupil size
+        if abs(pupil_change) < 0.1:
             score += 0.3
-        if 10 <= blink_rate <= 15:  # Normal blink rate
+        if 10 <= blink_rate <= 15:
             score += 0.4
-        if blink_rate < 10:  # Reduced blink rate (intense focus)
+        if blink_rate < 10:
             score += 0.3
         return min(1.0, score)
     
     def _calculate_tired_score(self, blink_rate, eye_openness_ratio):
+        """Calculate tired score based on blink rate and eye openness."""
         score = 0.0
-        if blink_rate > 20:  # Increased blink rate
+        if blink_rate > 20:
             score += 0.4
-        if eye_openness_ratio < 0.8:  # Eyes not fully open
+        if eye_openness_ratio < 0.8:
             score += 0.6
         return min(1.0, score)
     
     def _calculate_relaxed_score(self, pupil_change, blink_rate):
+        """Calculate relaxed score based on pupil stability and blink rate."""
         score = 0.0
-        if abs(pupil_change) < 0.05:  # Very stable pupil size
+        if abs(pupil_change) < 0.05:
             score += 0.5
-        if 15 <= blink_rate <= 20:  # Slightly elevated blink rate
+        if 15 <= blink_rate <= 20:
             score += 0.5
         return min(1.0, score)
     
     def _calculate_stressed_score(self, pupil_change, blink_rate):
+        """Calculate stressed score based on pupil variability and blink patterns."""
         score = 0.0
-        if abs(pupil_change) > 0.1:  # Fluctuating pupil size
+        if abs(pupil_change) > 0.1:
             score += 0.3
-        if blink_rate > 20:  # High blink rate
+        if blink_rate > 20:
             score += 0.3
-        if blink_rate < 5:  # Very low blink rate (frozen stare)
+        if blink_rate < 5:
             score += 0.4
         return min(1.0, score) 

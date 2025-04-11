@@ -47,6 +47,17 @@ python main.py
   - Eye height and contour points
   - Pupil position and movement
 
+Implementation Details:
+- Face Mesh initialization with optimized parameters:
+  - `max_num_faces=1`: Focus on single face detection
+  - `refine_landmarks=True`: Enhanced landmark accuracy
+  - `min_detection_confidence=0.5`: Balance between accuracy and performance
+  - `min_tracking_confidence=0.5`: Maintain tracking stability
+- Eye region landmarks:
+  - Left eye: Points 362-385
+  - Right eye: Points 33-160
+  - Iris tracking: Points 468-472 (left) and 473-477 (right)
+
 ### 2. Blink Detection
 - Monitors Eye Aspect Ratio (EAR) for each eye
 - Parameters:
@@ -59,6 +70,16 @@ python main.py
   - Blink duration
   - Blink rate (blinks per minute)
 
+Implementation Details:
+- EAR Calculation:
+  - Vertical eye height / horizontal eye width
+  - Running average of last 3 frames for stability
+- Blink State Machine:
+  - Open → Closing: EAR < threshold
+  - Closing → Closed: Consecutive frames below threshold
+  - Closed → Opening: EAR > threshold
+  - Opening → Open: Consecutive frames above threshold
+
 ### 3. Pupillometry Analysis
 - Real-time pupil size monitoring
 - Baseline calibration period
@@ -68,6 +89,17 @@ python main.py
   - Change velocity
   - Size variability
   - Baseline deviation
+
+Implementation Details:
+- Baseline Collection:
+  - 10-second calibration period
+  - Running average of first 10 measurements
+  - Adaptive baseline adjustment
+- Metrics Calculation:
+  - Change percentage: (current - baseline) / baseline
+  - Velocity: Change per second
+  - Variability: Standard deviation of recent measurements
+  - Smoothing: Exponential moving average
 
 ### 4. Emotion Detection
 Based on combined analysis of:
@@ -82,6 +114,18 @@ Detected States:
 - Tired: Increased blink rate and reduced eye openness
 - Relaxed: Stable measurements and normal blink rate
 - Stressed: Fluctuating pupil size and irregular blink patterns
+
+Implementation Details:
+- Score Calculation:
+  - Surprise: Eye openness ratio + pupil dilation
+  - Focus: Pupil stability + reduced blink rate
+  - Tired: Increased blink rate + reduced eye openness
+  - Relaxed: Stable measurements + normal blink rate
+  - Stressed: Pupil variability + irregular blink patterns
+- Temporal Analysis:
+  - 3-second history for blink patterns
+  - 1-second history for pupil dynamics
+  - Weighted scoring system (0-1)
 
 ## OSC Communication
 

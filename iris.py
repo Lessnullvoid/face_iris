@@ -224,6 +224,7 @@ class EmotionDetector:
         self.emotion_scores['tired'] = self._calculate_tired_score(blink_rate, eye_openness_ratio)
         self.emotion_scores['relaxed'] = self._calculate_relaxed_score(pupil_change, blink_rate)
         self.emotion_scores['stressed'] = self._calculate_stressed_score(pupil_change, blink_rate)
+        self.
         
         # Get dominant emotion
         dominant_emotion = max(self.emotion_scores.items(), key=lambda x: x[1])
